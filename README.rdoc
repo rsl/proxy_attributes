@@ -112,6 +112,7 @@ In order to avoided the dreaded <tt>ActiveRecord::HasManyThroughCantAssociateNew
 
 == Todo
 
-* At the moment, only <tt>has_many :through</tt> associations are handled. The code is in place to handle regular <tt>has_many</tt> associations but [to be frank] I am pressed for time at the moment and don't need <tt>has_many</tt> support in the project I am using this code in.
+* Add one-to-one and one-to-many support? many-to-one support already exists
+* Add tests for STI and/or support for STI as needed
 
 Copyright (c) 2008 Lucky Sneaks, released under the MIT license
