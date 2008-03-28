@@ -92,12 +92,10 @@ module LuckySneaks
         self.send(proxy.name) << string.split(/,\s*/).map { |substring|
           next if substring.blank?
           member = proxy.klass.send("find_or_initialize_by_#{attribute}", substring)
-          # Only return valid, saved members
           if member.save
             member
           else
             postpone_errors member
-            # Don't add this member!
             nil
           end
         }.uniq.compact
@@ -106,9 +104,14 @@ module LuckySneaks
       def create_proxy_member(association_id, hash_of_attributes)
         proxy = fetch_proxy(association_id.sub(/add_/, ""))
         
+        unless proxy.through_reflection
+          hash_of_attributes.merge!(proxy.primary_key_name => id)
+        end
         member = proxy.klass.new(hash_of_attributes)
         if member.save
-          self.send(proxy.name) << member
+          if proxy.through_reflection
+            self.send(proxy.name) << member
+          end
         else
           postpone_errors member
         end
