@@ -1,8 +1,8 @@
 module LuckySneaks
   module ProxyAttributesFormHelpers
     # Simply a shortcut for the somewhat standard check_box_tag used for
-    # <tt>has_and_belongs_to_many</tt> checkboxes popularized by ryan bates'
-    # railscasts[http://railscasts.com/episodes/17]
+    # <tt>has_and_belongs_to_many</tt> checkboxes popularized by Ryan Bates'
+    # Railscast[http://railscasts.com/episodes/17]
     # 
     # The following examples are equivalent
     # 

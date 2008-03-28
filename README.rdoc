@@ -19,8 +19,13 @@ Let's look at some examples and then I'll point out any features not salient fro
     proxy_attributes
       # Will provide category_ids= method, in addition to add_category
       by_ids :categories
+      
       # Will provide tags_as_string= method, in addition to add_tag
       by_string :tags => :title
+      
+      # There's also just_defaults which simply adds add_foos
+      # shown here just for the sake of example [but commented out, natch!]
+      # just_defaults :foos
     end
   end
 
@@ -42,12 +47,12 @@ Let's look at some examples and then I'll point out any features not salient fro
   
 In that short code there, you've just:
 
-1. created a new Document [titled: "Document Title"]
-2. added three Tags [titled: "simple", "clean", and "elegant even"],
+1. created a new document [titled: "Document Title"]
+2. added three tags [titled: "simple", "clean", and "elegant even"],
 3. associated them with the new document,
-4. created a new Category [titled: "New Category"],
+4. created a new category [titled: "New Category"],
 5. associated _it_ with the new document,
-6. and associated two pre-existing Categories [those with ids: 8 and 15] with the document.
+6. and associated two pre-existing categories [those with ids: 8 and 15] with the document.
 
 Not bad, eh?
   
@@ -86,9 +91,9 @@ Maybe you're thinking all that simplicity comes at some serious expense in your 
 
 A few notes on that view...
 
-*proxy_attributes_check_box_tag*:: Read the docs[link:classes/LuckySneaks/ProxyAttributesFormHelpers.html#M000003]. It's really just that simple. Really.
-*fields_for(html_name, actual_proxy_object)*:: Nothing really spectacular to note here either. Except that <tt>@document.add_category</tt> returns a new Category just to please fields_for. Most of the time you should not be calling +add_child+ directly but using it with an attribute hash as shown in the example for the controller code.
-*f.text_field :tags_as_string*:: Using the models in the example, this handy little method [internal to the model, not the view] is shorthand for <tt>@document.tags.map(&:title).join(", ")</tt>. Hopefully comma-separated tags [or whatever] are everyone's bag. If not, please let me know and I'll see what i can do about accommodating your preferences. Or, better yet, just fork ProxyAttributes @ github, patch away, and gimme a pull request.
+<tt>proxy_attributes_check_box_tag</tt> :: Read the docs[link:classes/LuckySneaks/ProxyAttributesFormHelpers.html#M000003]. It's really just that simple. Really.
+<tt>fields_for(html_name, actual_proxy_object)</tt> :: Nothing really spectacular to note here either. Except that <tt>@document.add_category</tt> returns a new Category just to please <tt>fields_for</tt>. Most of the time you should not be calling +add_child+ directly but using it with an attribute hash as shown in the example for the controller code.
+<tt>f.text_field :tags_as_string</tt> :: Using the models in the example, this handy little method [internal to the model, not the view] is shorthand for <tt>@document.tags.map(&:title).join(", ")</tt>. Hopefully comma-separated tags [or whatever] are everyone's bag. If not, please let me know and I'll see what i can do about accommodating your preferences. Or, better yet, just fork ProxyAttributes from github[http://github.com/rsl/proxy_attributes/tree/master], patch away, and gimme a pull request.
   
 If you want multiple <tt>add_child</tt> fields, simply add an index value to the fields_for arguments like so:
 
@@ -103,7 +108,7 @@ And set it and forget it!
   
 == But, but...
 
-In order to avoided the dreaded <tt>ActiveRecord::HasManyThroughCantAssociateNewRecords</tt> exception, ProxyAttributes moves association creations to after_saves. This saves in a lot of frustration for most use cases I can think of but obviously causes a problem with models [in the child associations] that have many validations which can fail. The default settings for ProxyAttributes is to simply swallow child validation errors and either not create the new child or not save the invalid changes. This behavior can be overridden with the <tt>dont_swallow_errors!</tt> directive inside the <tt>proxy_attributes</tt>block which will raise <tt>LuckySneaks::ProxyAttributes::InvalidChildAssignment</tt>. _*You*_ are responsible for rescuing this exception in your controller. There's no way to cause the parent model [which has already passed validation and been saved] to be invalid. Instead, errors are added to <tt>:proxy_attribute_child_errors</tt> if you want to parse that for your error messages.
+In order to avoided the dreaded <tt>ActiveRecord::HasManyThroughCantAssociateNewRecords</tt> exception, ProxyAttributes moves association creations to after_saves. This saves in a lot of frustration for most use cases I can think of but obviously causes a problem with models [in the child associations] that have many validations which can fail. The default settings for ProxyAttributes is to simply swallow child validation errors and either not create the new child or not save the invalid changes. This behavior can be overridden with the <tt>dont_swallow_errors!</tt> directive inside the <tt>proxy_attributes</tt> block which will raise <tt>LuckySneaks::ProxyAttributes::InvalidChildAssignment</tt>. <b><em>You</em></b> are responsible for rescuing this exception in your controller. There's no way to cause the parent model [which has already passed validation and been saved] to be invalid. Instead, errors are added to <tt>:proxy_attribute_child_errors</tt> if you want to parse that for your error messages.
 
 == Todo
 

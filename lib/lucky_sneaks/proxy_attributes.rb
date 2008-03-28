@@ -1,4 +1,6 @@
+# Just a namespace, move along!
 module LuckySneaks
+  # Another namespace, keep moving!
   module ProxyAttributes
     def self.included(base) # :nodoc:
       base.extend ClassMethods
@@ -6,19 +8,7 @@ module LuckySneaks
     end
     
     module ClassMethods
-      # This is the meat of everything
-      # 
-      # TODO: More documentation
-      # 
-      # Note: By default, invalid child records are simply discarded.
-      # If a child record has already been saved, invalid changes will not be saved.
-      # ProxyAttributes was designed for simplifying form inputs and
-      # works best in cases where invalid children can be ignored.
-      # If you require validation for your children, you can use
-      # <tt>dont_swallow_errors!</tt> within your <tt>proxy_attributes</tt>
-      # block to raise LuckySneaks::ProxyAttributes::InvalidChildAssignment.
-      # *You* are responsible for catching this exception in your controllers.
-      # There will be an error on base noting what exactly failed.
+      # Please read the README.rdoc[link:files/README_rdoc.html] for a full explanation and example of this method
       def proxy_attributes(&block)
         cattr_accessor :attributes_for_string, :dont_swallow_errors
         self.attributes_for_string = {}.with_indifferent_access
@@ -30,7 +20,8 @@ module LuckySneaks
       end
     end
     
-    module InstanceMethods
+    module InstanceMethods # :nodoc:
+    private
       # Holds assignment hashes postponed for after_save
       # when the parent object is a new record.
       # This is really meant for use internally
@@ -39,8 +30,7 @@ module LuckySneaks
       def postponed
         @postponed ||= {}
       end
-    
-    private
+      
       def assign_postponed
         postponed.each do |association_id, assignment|
           assign_or_postpone association_id => assignment
@@ -132,6 +122,7 @@ module LuckySneaks
       end
     end
     
+    # Just a custom exception. Nothing to see here.
     class InvalidChildAssignment < StandardError; end
   end
 end
