@@ -52,34 +52,34 @@ Let's look at some examples and then I'll point out any features not salient fro
 
 Maybe you're thinking all that simplicity comes at some serious expense in your views. Wrong!
 
-<% form_for(@document) do |f| %>
-  <p>
-    <%= f.label :title %>
-    <%= f.text_field :title %>
-  </p>
-  <% unless @categories.empty? %>
+  <% form_for(@document) do |f| %>
     <p>
-      <label>Check Categories</label>
-      <% @categories.each do |category| %>
-        <%= category.title %>
-        <%= proxy_attributes_check_box_tag :document, :category_ids, category %>
+      <%= f.label :title %>
+      <%= f.text_field :title %>
+    </p>
+    <% unless @categories.empty? %>
+      <p>
+        <label>Check Categories</label>
+        <% @categories.each do |category| %>
+          <%= category.title %>
+          <%= proxy_attributes_check_box_tag :document, :category_ids, category %>
+        <% end %>
+      </p>
+    <% end %>
+    <p>
+      <% fields_for("document[add_category]", @document.add_category) do |ff| %>
+        <%= ff.label :title, "New Category (Title)" %>
+        <%= ff.text_field :title %>
       <% end %>
     </p>
+    <p>
+      <%= f.label :tags_as_string, "Tags" %>
+      <%= f.text_field :tags_as_string %>
+    </p>
+    <p>
+      <%= f.submit "Create" %>
+    </p>
   <% end %>
-  <p>
-    <% fields_for("document[add_category]", @document.add_category) do |ff| %>
-      <%= ff.label :title, "New Category (Title)" %>
-      <%= ff.text_field :title %>
-    <% end %>
-  </p>
-  <p>
-    <%= f.label :tags_as_string, "Tags" %>
-    <%= f.text_field :tags_as_string %>
-  </p>
-  <p>
-    <%= f.submit "Create" %>
-  </p>
-<% end %>
 
 A few notes on that view...
 
