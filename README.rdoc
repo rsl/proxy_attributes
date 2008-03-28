@@ -62,21 +62,25 @@ Maybe you're thinking all that simplicity comes at some serious expense in your 
 
   <% form_for(@document) do |f| %>
     <p>
-      <%= f.label :title %>
+      <%= f.label :title, "Document Title" %>
       <%= f.text_field :title %>
     </p>
     <% unless @categories.empty? %>
       <p>
-        <label>Check Categories</label>
-        <% @categories.each do |category| %>
-          <%= category.title %>
-          <%= proxy_attributes_check_box_tag :document, :category_ids, category %>
-        <% end %>
+        <label>Categories</label>
+        <ul>
+          <% @categories.each do |category| %>
+            <li>
+              <%= category.title %>
+              <%= proxy_attributes_check_box_tag :document, :category_ids, category %>
+            </li>
+          <% end %>
+        </ul>
       </p>
     <% end %>
     <p>
       <% fields_for("document[add_category]", @document.add_category) do |ff| %>
-        <%= ff.label :title, "New Category (Title)" %>
+        <%= ff.label :title, "New Category Title" %>
         <%= ff.text_field :title %>
       <% end %>
     </p>
@@ -99,12 +103,21 @@ If you want multiple <tt>add_child</tt> fields, simply add an index value to the
 
   <p>
     <% fields_for("document[add_category][#{index}]", @document.add_category[index]) do |ff| %>
-      <%= ff.label :title, "New Category (Title)" %>
+      <%= ff.label :title, "New Category Title" %>
       <%= ff.text_field :title %>
     <% end %>
   </p>
   
-And set it and forget it!
+You'll need to use <tt>manage_child</tt> for your edit form needs. You'll probably be doing this in a loop like this:
+  
+  <% @document.categories.each do |category| %>
+    <p>
+      <% fields_for("document[manage_category][#{category.id}]", @document.manage_category[category.id]) do |ff| %>
+        <%= ff.label :title, "Category #{category.id} Title" %>
+        <%= ff.text_field :title %>
+      <% end %>
+    </p>
+  <% end %>
   
 == But, but...
 
