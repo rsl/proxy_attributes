@@ -83,9 +83,9 @@ Maybe you're thinking all that simplicity comes at some serious expense in your 
 
 A few notes on that view...
 
-  +proxy_attributes_check_box_tag+:: Read the docs[link:classes/LuckySneaks/ProxyAttributesFormHelpers.html#M000003]. It's really just that simple. Really.
-  +fields_for(html_name, actual_proxy_object)+:: Nothing really spectacular to note here either. Except that +@document.add_category+ returns a new Category just to please fields_for. Most of the time you should not be calling +add_child+ directly but using it with an attribute hash as shown in the example for the controller code.
-  +f.text_field :tags_as_string+:: Using the models in the example, this handy little method [internal to the model, not the view] is shorthand for @document.tags.map(&:title).join(", "). Hopefully comma-separated tags [or whatever] are everyone's bag. If not, please let me know and I'll see what i can do about accommodating your preferences. Or, better yet, just fork ProxyAttributes @ github, patch away, and gimme a pull request.
++proxy_attributes_check_box_tag+:: Read the docs[link:classes/LuckySneaks/ProxyAttributesFormHelpers.html#M000003]. It's really just that simple. Really.
++fields_for(html_name, actual_proxy_object)+:: Nothing really spectacular to note here either. Except that +@document.add_category+ returns a new Category just to please fields_for. Most of the time you should not be calling +add_child+ directly but using it with an attribute hash as shown in the example for the controller code.
++f.text_field :tags_as_string+:: Using the models in the example, this handy little method [internal to the model, not the view] is shorthand for @document.tags.map(&:title).join(", "). Hopefully comma-separated tags [or whatever] are everyone's bag. If not, please let me know and I'll see what i can do about accommodating your preferences. Or, better yet, just fork ProxyAttributes @ github, patch away, and gimme a pull request.
   
 If you want multiple +add_child+ fields, simply add an index value to the fields_for arguments like so:
 
@@ -105,6 +105,5 @@ In order to avoided the dreaded ActiveRecord::HasManyThroughCantAssociateNewReco
 == Todo
 
 * At the moment, only +has_many :through+ associations are handled. The code is in place to handle regular +has_many+ associations but [to be frank] I am pressed for time at the moment and don't need +has_many+ support in the project I am using this code in.
-* Because 
 
 Copyright (c) 2008 Lucky Sneaks, released under the MIT license
