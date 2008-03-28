@@ -281,4 +281,18 @@ class PostponeAssociationsTest < Test::Unit::TestCase
     assert @doc.mystery_meats.include?(@mystery_meat)
     assert_equal @doc, @mystery_meat.document
   end
+  
+  def test_manage_child_hash_returns_object_for_existing_keys
+    @doc = saveable_doc(:tags_as_string => "manageable")
+    @doc.save
+    @tag = Tag.find_by_title("manageable")
+    assert_equal @tag, @doc.manage_tag[@tag.id]
+  end
+  
+  def test_manage_child_hash_returns_new_object_for_nil_keys
+    @doc = saveable_doc
+    # Man I wish Foo.new == Foo.new, but it doesn't
+    assert @doc.manage_tag[nil].is_a?(Tag)
+    assert @doc.manage_tag[nil].new_record?
+  end
 end

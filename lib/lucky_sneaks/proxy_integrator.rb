@@ -105,6 +105,14 @@ module LuckySneaks
             klass.new postponed["add_#{association_singular}"]
           end
         end
+        
+        define_method "manage_#{association_singular}" do
+          klass = association_singular.classify.constantize
+          self.send(association_id).inject(Hash.new(klass.new)) do |memo, member|
+            memo[member.id] = member
+            memo
+          end
+        end
       end
     end
   end
