@@ -71,7 +71,8 @@ module LuckySneaks
       def assign_proxy_by_ids(association_id, array_of_ids)
         proxy = fetch_proxy(association_id.chomp("_ids"))
         
-        self.send(proxy.through_reflection.name).clear
+        reset_proxy(proxy)
+        
         self.send(proxy.name) << proxy.klass.find(array_of_ids)
       end
       
@@ -80,7 +81,8 @@ module LuckySneaks
         proxy = fetch_proxy(association_id)
         attribute = self.class.attributes_for_string[association_id.to_sym]
         
-        self.send(proxy.through_reflection.name).clear
+        reset_proxy(proxy)
+        
         self.send(proxy.name) << string.split(/,\s*/).map { |substring|
           next if substring.blank?
           member = proxy.klass.send("find_or_initialize_by_#{attribute}", substring)
@@ -108,6 +110,14 @@ module LuckySneaks
       
       def fetch_proxy(association_id)
         self.class.reflect_on_association(association_id.pluralize.to_sym)
+      end
+      
+      def reset_proxy(proxy)
+        if proxy.through_reflection
+          self.send(proxy.through_reflection.name).clear
+        else
+          self.send(proxy.name).clear
+        end
       end
       
       def postpone_errors(member)

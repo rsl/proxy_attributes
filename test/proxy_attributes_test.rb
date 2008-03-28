@@ -35,6 +35,16 @@ ActiveRecord::Schema.define(:version => 1) do
   create_table :taggings, :force => true do |t|
     t.integer :document_id, :tag_id
   end
+  
+  create_table :attachments, :force => true do |t|
+    t.integer :document_id
+    t.string :title
+  end
+  
+  create_table :mystery_meats, :force => true do |t|
+    t.integer :document_id
+    t.string :meat
+  end
 end
 ActiveRecord::Migration.verbose = true
 
@@ -45,9 +55,12 @@ class Document < ActiveRecord::Base
   has_many :taggings
   has_many :tags, :through => :taggings
   
+  has_many :attachments
+  has_many :mystery_meats
+  
   proxy_attributes do
-    by_ids :categories
-    by_string :tags => :title
+    by_ids :categories, :attachments
+    by_string :tags => :title, :mystery_meats => :meat
   end
   
   validates_presence_of :title
@@ -77,6 +90,14 @@ class Tagging < ActiveRecord::Base
   belongs_to :tag
 end
 
+class Attachment < ActiveRecord::Base
+  belongs_to :document
+end
+
+class MysteryMeat < ActiveRecord::Base
+  belongs_to :document
+end
+
 class PostponeAssociationsTest < Test::Unit::TestCase
   def saveable_doc(optional = {})
     unsaveable_doc(optional.merge(:title => "Saveable"))
@@ -91,6 +112,7 @@ class PostponeAssociationsTest < Test::Unit::TestCase
     Document.delete_all
     Category.delete_all
     Tag.delete_all
+    Attachment.delete_all
   end
   
   def test_assigns_children_by_ids_if_parent_saves
@@ -108,6 +130,16 @@ class PostponeAssociationsTest < Test::Unit::TestCase
     assert @doc.categories.empty?
     assert @cat.documents.empty?
     assert_equal [@cat.id], @doc.category_ids
+  end
+  
+  def test_assigns_children_by_ids_plain_has_many_support
+    @attachment = Attachment.create(:title => "Unattached")
+    @doc = saveable_doc(:attachment_ids => [@attachment.id])
+    @doc.save
+    @attachment.reload
+    assert @doc.attachments.include?(@attachment)
+    assert_equal @doc, @attachment.document
+    assert_equal [@attachment.id], @doc.attachment_ids
   end
   
   def test_creates_child_by_ids_if_parent_saves
@@ -145,7 +177,7 @@ class PostponeAssociationsTest < Test::Unit::TestCase
   end
   
   def test_add_child_creates_multiple_records
-    @doc = saveable_doc(:add_category => {"1" => {:title => "First"}, "2" => {:title => "Second"}})
+    @doc = saveable_doc(:add_category => {1 => {:title => "First"}, 2 => {:title => "Second"}})
     @doc.save
     assert Category.find_by_title("First")
     assert Category.find_by_title("Second")
@@ -153,11 +185,19 @@ class PostponeAssociationsTest < Test::Unit::TestCase
   end
   
   def test_caches_multiple_attributes_for_reassignment_if_parent_save_fails
-    @doc = unsaveable_doc(:add_category => {"1" => {:title => "First"}, "2" => {:title => "Second"}})
+    @doc = unsaveable_doc(:add_category => {1 => {:title => "First"}, 2 => {:title => "Second"}})
     @doc.save
     # Man I wish Foo.new == Foo.new, but it doesn't
-    assert_equal({"title" => "First"}, @doc.add_category["1"].attributes)
-    assert_equal({"title" => "Second"}, @doc.add_category["2"].attributes)
+    assert_equal({"title" => "First"}, @doc.add_category[1].attributes)
+    assert_equal({"title" => "Second"}, @doc.add_category[2].attributes)
+  end
+  
+  def test_add_child_support_for_plain_has_many
+    @doc = saveable_doc(:add_attachment => {:title => "Clingy"})
+    @doc.save
+    @attachment = Attachment.find_by_title("Clingy")
+    assert @doc.attachments.include?(@attachment)
+    assert_equal @doc, @attachment.document
   end
   
   def test_assigns_children_by_string_if_parent_saves
@@ -232,5 +272,13 @@ class PostponeAssociationsTest < Test::Unit::TestCase
   
   def test_children_as_string_reader_should_return_empty_string_not_nil
     assert_equal "", Document.new.tags_as_string
+  end
+  
+  def test_children_as_string_plain_has_many_support
+    @doc = saveable_doc(:mystery_meats_as_string => "scoobish snack")
+    @doc.save
+    @mystery_meat = MysteryMeat.find_by_meat("scoobish snack")
+    assert @doc.mystery_meats.include?(@mystery_meat)
+    assert_equal @doc, @mystery_meat.document
   end
 end
