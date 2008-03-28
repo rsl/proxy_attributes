@@ -282,17 +282,27 @@ class PostponeAssociationsTest < Test::Unit::TestCase
     assert_equal @doc, @mystery_meat.document
   end
   
-  def test_manage_child_hash_returns_object_for_existing_keys
+  def test_manage_child_updates_object
+    @doc = saveable_doc(:add_tag => {:title => "updateable"})
+    @doc.save
+    @tag = Tag.find_by_title("updateable")
+    @doc.update_attributes(:manage_tag => {@tag.id => {:title => "updated!"}})
+    @tag.reload
+    assert_equal "updated!", @tag.title
+  end
+  
+  def test_manage_child_hash_returns_object_for_keys_with_objects
     @doc = saveable_doc(:tags_as_string => "manageable")
     @doc.save
     @tag = Tag.find_by_title("manageable")
     assert_equal @tag, @doc.manage_tag[@tag.id]
   end
   
-  def test_manage_child_hash_returns_new_object_for_nil_keys
+  def test_manage_child_hash_raises_exception_for_keys_with_no_objects
     @doc = saveable_doc
-    # Man I wish Foo.new == Foo.new, but it doesn't
-    assert @doc.manage_tag[nil].is_a?(Tag)
-    assert @doc.manage_tag[nil].new_record?
+    @doc.save
+    assert_raises LuckySneaks::ProxyAttributes::ImproperAccess do
+      @doc.manage_tag[nil]
+    end
   end
 end

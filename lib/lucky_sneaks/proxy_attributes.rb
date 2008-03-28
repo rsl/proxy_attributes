@@ -49,26 +49,32 @@ module LuckySneaks
             if association_id =~ /_ids$/
               assignment.delete 0
               return if assignment == self.send("#{association_id}_without_postponed")
-              assign_proxy_by_ids association_id, assignment
+              assign_proxy_members_by_ids association_id, assignment
             elsif association_id =~ /_as_string$/
               return if assignment == self.send("#{association_id}_without_postponed")
-              assign_proxy_by_string association_id, assignment
+              assign_proxy_members_by_string association_id, assignment
             elsif association_id =~ /^add_/
               return if assignment.values.all?{|v| v.blank?}
               if assignment.values.first.is_a?(Hash)
                 assignment.each do |index, actual_assignment|
                   next if actual_assignment.values.all?{|v| v.blank?}
-                  create_proxy association_id, actual_assignment
+                  create_proxy_member association_id, actual_assignment
                 end
               else
-                create_proxy association_id, assignment
+                create_proxy_member association_id, assignment
+              end
+            elsif association_id =~ /^manage_/
+              if assignment.values.first.is_a?(Hash)
+                assignment.each do |member_id, actual_assignment|
+                  manage_proxy_member association_id, member_id, actual_assignment
+                end
               end
             end
           end
         end
       end
       
-      def assign_proxy_by_ids(association_id, array_of_ids)
+      def assign_proxy_members_by_ids(association_id, array_of_ids)
         proxy = fetch_proxy(association_id.chomp("_ids"))
         
         reset_proxy(proxy)
@@ -76,7 +82,7 @@ module LuckySneaks
         self.send(proxy.name) << proxy.klass.find(array_of_ids)
       end
       
-      def assign_proxy_by_string(association_id, string)
+      def assign_proxy_members_by_string(association_id, string)
         association_id = association_id.chomp("_as_string")
         proxy = fetch_proxy(association_id)
         attribute = self.class.attributes_for_string[association_id.to_sym]
@@ -97,13 +103,22 @@ module LuckySneaks
         }.uniq.compact
       end
       
-      def create_proxy(association_id, hash_of_attributes)
+      def create_proxy_member(association_id, hash_of_attributes)
         proxy = fetch_proxy(association_id.sub(/add_/, ""))
         
         member = proxy.klass.new(hash_of_attributes)
         if member.save
           self.send(proxy.name) << member
         else
+          postpone_errors member
+        end
+      end
+      
+      def manage_proxy_member(association_id, member_id, hash_of_attributes)
+        proxy = fetch_proxy(association_id.sub(/manage_/, ""))
+        
+        member = proxy.klass.find_by_id(member_id)
+        unless member.update_attributes(hash_of_attributes)
           postpone_errors member
         end
       end
@@ -133,6 +148,11 @@ module LuckySneaks
     end
     
     # Just a custom exception. Nothing to see here.
+    # Seriously... This won't get raised unless you are prepared for it.
+    # Trust me.
     class InvalidChildAssignment < StandardError; end
+    
+    # Raised when manage_tag[n] is called when there's no associated object with id = n
+    class ImproperAccess < StandardError; end
   end
 end

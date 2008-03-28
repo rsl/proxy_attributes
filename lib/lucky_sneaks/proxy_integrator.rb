@@ -106,11 +106,22 @@ module LuckySneaks
           end
         end
         
+        define_method "manage_#{association_singular}=" do |hash_of_attributes|
+          assign_or_postpone "manage_#{association_singular}" => hash_of_attributes
+        end
+        
         define_method "manage_#{association_singular}" do
-          klass = association_singular.classify.constantize
-          self.send(association_id).inject(Hash.new(klass.new)) do |memo, member|
-            memo[member.id] = member
-            memo
+          name = "@managed_#{association_singular}"
+          if managed = instance_variable_get("@managed_#{association_singular}")
+            managed
+          else
+            klass = association_singular.classify.constantize
+            instance_variable_set("@managed_#{association_singular}",
+              self.send(association_id).inject(Hash.new{|h, k| raise LuckySneaks::ProxyAttributes::ImproperAccess}){ |memo, member|
+              # This is body to the inject block
+              memo[member.id] = member
+              memo
+            })
           end
         end
       end
