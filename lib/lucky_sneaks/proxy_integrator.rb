@@ -94,15 +94,17 @@ module LuckySneaks
         end
         
         define_method "add_#{association_singular}" do
+          name = "@add_#{association_singular}"
+          return instance_variable_get(name) if instance_variable_get(name)
           klass = association_singular.classify.constantize
           if postponed["add_#{association_singular}"].is_a?(Hash) && postponed["add_#{association_singular}"].values.first.is_a?(Hash)
-            returning({}) do |reified|
-              postponed["add_#{association_singular}"].each do |key, value|
-                reified[key.to_i] = klass.new value
-              end
+            result = {}
+            postponed["add_#{association_singular}"].each do |key, value|
+              result[key.to_i] = klass.new value
             end
+            instance_variable_set name, result
           else
-            klass.new postponed["add_#{association_singular}"]
+            instance_variable_set name, klass.new(postponed["add_#{association_singular}"])
           end
         end
         
