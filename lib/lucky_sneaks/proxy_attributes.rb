@@ -8,10 +8,12 @@ module LuckySneaks
     end
     
     module ClassMethods
-      # Please read the README.rdoc[link:files/README_rdoc.html] for a full explanation and example of this method
+      # Please read the README.rdoc[link:files/README_rdoc.html]
+      # for a full explanation and example of this method
       def proxy_attributes(&block)
-        cattr_accessor :attributes_for_string, :dont_swallow_errors
+        cattr_accessor :attributes_for_string, :dont_swallow_errors, :proxy_attribute_procs
         self.attributes_for_string = {}.with_indifferent_access
+        self.proxy_attribute_procs = {}.with_indifferent_access
         
         integrator = LuckySneaks::ProxyIntegrator.new(self)
         integrator.instance_eval(&block)
@@ -43,25 +45,42 @@ module LuckySneaks
       
       def assign_or_postpone(assignment_hash)
         if new_record?
-          postponed.merge! assignment_hash
+          assignment_hash.each do |association_id, assignment|
+            if fallback = self.class.proxy_attribute_procs[association_id]
+              assigned = fallback.call(assignment)
+              if assigned.is_a?(ActiveRecord::Base)
+                association_ids = "#{assigned.class.class_name.downcase}_ids"
+                if postponed[association_ids]
+                  postponed[association_ids] << [assigned.id]
+                else
+                  postponed[association_ids] = [assigned.id]
+                end
+              end
+            else
+              postponed.merge! assignment_hash
+            end
+          end
         else
           assignment_hash.each do |association_id, assignment|
             if association_id =~ /_ids$/
               assignment.delete 0
-              return if assignment == self.send("#{association_id}_without_postponed")
               assign_proxy_members_by_ids association_id, assignment
             elsif association_id =~ /_as_string$/
               return if assignment == self.send("#{association_id}_without_postponed")
               assign_proxy_members_by_string association_id, assignment
             elsif association_id =~ /^add_/
-              return if assignment.values.all?{|v| v.blank?}
-              if assignment.values.first.is_a?(Hash)
-                assignment.each do |index, actual_assignment|
-                  next if actual_assignment.values.all?{|v| v.blank?}
-                  create_proxy_member association_id, actual_assignment
+              if assignment.is_a?(Hash)
+                return if assignment.values.all?{|v| v.blank?}
+                if assignment.values.first.is_a?(Hash)
+                  assignment.each do |index, actual_assignment|
+                    next if actual_assignment.values.all?{|v| v.blank?}
+                    create_proxy_member association_id, actual_assignment
+                  end
+                else
+                  create_proxy_member association_id, assignment
                 end
               else
-                create_proxy_member association_id, assignment
+                push_proxy_member association_id, assignment
               end
             elsif association_id =~ /^manage_/
               if assignment.values.first.is_a?(Hash)
@@ -76,6 +95,13 @@ module LuckySneaks
       
       def assign_proxy_members_by_ids(association_id, array_of_ids)
         proxy = fetch_proxy(association_id.chomp("_ids"))
+        
+        if array_of_ids == self.send("#{association_id}_without_postponed")
+          if self.class.proxy_attribute_procs["add_#{proxy.name.to_s.singularize}"]
+            proxy.klass.update array_of_ids, Array.new(array_of_ids.size, {proxy.primary_key_name => id})
+          end
+          return
+        end
         
         reset_proxy(proxy)
         
@@ -115,6 +141,11 @@ module LuckySneaks
         else
           postpone_errors member
         end
+      end
+      
+      def push_proxy_member(association_id, member)
+        proxy = fetch_proxy(association_id.sub(/add_/, ""))
+        self.send(proxy.name) << member
       end
       
       def manage_proxy_member(association_id, member_id, hash_of_attributes)

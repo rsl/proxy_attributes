@@ -38,6 +38,11 @@ ActiveRecord::Schema.define(:version => 1) do
   
   create_table :attachments, :force => true do |t|
     t.integer :document_id
+    t.string :title, :filename, :content_type
+  end
+  
+  create_table :badges, :force => true do |t|
+    t.integer :document_id
     t.string :title
   end
   
@@ -56,11 +61,15 @@ class Document < ActiveRecord::Base
   has_many :tags, :through => :taggings
   
   has_many :attachments
+  has_many :badges
   has_many :mystery_meats
   
   proxy_attributes do
-    by_ids :categories, :attachments
+    by_ids :categories, :badges
     by_string :tags => :title, :mystery_meats => :meat
+    by_proc :attachments do |params|
+      Attachment.create(params)
+    end
   end
   
   validates_presence_of :title
@@ -92,6 +101,15 @@ end
 
 class Attachment < ActiveRecord::Base
   belongs_to :document
+  
+  def upload=(file_upload)
+    self.filename = file_upload.original_filename
+    self.content_type = file_upload.content_type
+  end
+end
+
+class Badge < ActiveRecord::Base
+  belongs_to :document
 end
 
 class MysteryMeat < ActiveRecord::Base
@@ -107,12 +125,23 @@ class PostponeAssociationsTest < Test::Unit::TestCase
     Document.new(optional)
   end
   
+  def uploaded_jpg
+    filename = "bell.jpg"
+    returning Tempfile.new(filename) do |t|
+      FileUtils.copy_file File.join(File.dirname(__FILE__), 'fixtures', 'bell.jpg'), t.path
+      (class << t; self; end).class_eval do
+        alias local_path path
+        define_method(:original_filename) { filename }
+        define_method(:content_type) { "image/jpeg" }
+      end
+    end
+  end
+  
   def setup
     # Just to be safe
-    Document.delete_all
-    Category.delete_all
-    Tag.delete_all
-    Attachment.delete_all
+    [Document, Category, Tag, Attachment, MysteryMeat].each do |foo|
+      foo.delete_all
+    end
   end
   
   def test_assigns_children_by_ids_if_parent_saves
@@ -133,13 +162,13 @@ class PostponeAssociationsTest < Test::Unit::TestCase
   end
   
   def test_assigns_children_by_ids_plain_has_many_support
-    @attachment = Attachment.create(:title => "Unattached")
-    @doc = saveable_doc(:attachment_ids => [@attachment.id])
+    @badge = Badge.create(:title => "Unattached")
+    @doc = saveable_doc(:badge_ids => [@badge.id])
     @doc.save
-    @attachment.reload
-    assert @doc.attachments.include?(@attachment)
-    assert_equal @doc, @attachment.document
-    assert_equal [@attachment.id], @doc.attachment_ids
+    @badge.reload
+    assert @doc.badges.include?(@badge)
+    assert_equal @doc, @badge.document
+    assert_equal [@badge.id], @doc.badge_ids
   end
   
   def test_creates_child_by_ids_if_parent_saves
@@ -193,11 +222,11 @@ class PostponeAssociationsTest < Test::Unit::TestCase
   end
   
   def test_add_child_support_for_plain_has_many
-    @doc = saveable_doc(:add_attachment => {:title => "Clingy"})
+    @doc = saveable_doc(:add_badge => {:title => "Clingy"})
     @doc.save
-    @attachment = Attachment.find_by_title("Clingy")
-    assert @doc.attachments.include?(@attachment)
-    assert_equal @doc, @attachment.document
+    @badge = Badge.find_by_title("Clingy")
+    assert @doc.badges.include?(@badge)
+    assert_equal @doc, @badge.document
   end
   
   def test_assigns_children_by_string_if_parent_saves
@@ -304,5 +333,32 @@ class PostponeAssociationsTest < Test::Unit::TestCase
     assert_raises LuckySneaks::ProxyAttributes::ImproperAccess do
       @doc.manage_tag[nil]
     end
+  end
+  
+  def test_adds_child_by_proc_if_parent_saves
+    @doc = saveable_doc(:add_attachment => {:upload => uploaded_jpg, :title => "uploadable"})
+    @doc.save
+    @attachment = Attachment.find_by_title("uploadable")
+    assert_equal [@attachment], @doc.attachments
+    assert_equal @doc, @attachment.document
+  end
+  
+  def test_add_child_by_proc_creates_unassociated_child_when_parent_save_fails
+    @doc = unsaveable_doc(:add_attachment => {:upload => uploaded_jpg, :title => "unsaveable parent"})
+    @doc.save
+    @attachment = Attachment.find_by_title("unsaveable parent")
+    assert @attachment.document.nil?
+    # However...
+    assert_equal [@attachment], @doc.attachments
+    # Because...
+    assert_equal [@attachment], @doc.attachments_with_postponed
+    assert_equal [], @doc.attachments_without_postponed
+  end
+  
+  def test_add_child_by_proc_adds_created_child_id_to_postponed_child_ids_when_parent_save_fails
+    @doc = unsaveable_doc(:add_attachment => {:upload => uploaded_jpg, :title => "postponeable by id"})
+    @doc.save
+    @attachment = Attachment.find_by_title("postponeable by id")
+    assert_equal [@attachment.id], @doc.postponed_attachment_ids
   end
 end

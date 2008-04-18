@@ -63,13 +63,32 @@ module LuckySneaks
       end
     end
     
-    # TODO: Give this muscle and bone!
-    def by_proc(*association_ids, &block)
-      association_ids.each do |association_id|
-        # Do something with that block there!
+    # Used to force creation of the child object instead of postponing its creation.
+    # After the child is created it's handled as if it were <tt>by_ids</tt> in regards to how
+    # it is postponed.
+    # 
+    # I personally only use this for uploads where the file has been uploaded and a tempfile
+    # created and needs to be handled immediately. It's not the prettiest methodology and
+    # just might change in the near future.
+    # 
+    # Note: You'll need to have a hidden field with <tt>postponed_child_ids</tt>
+    # (where the name reflects the actual child association [not the word "child"])
+    def by_proc(association_id, &block)
+      association_singular = association_id.to_s.singularize
+      
+      parent.proxy_attribute_procs["add_#{association_singular}"] = block
+      
+      parent.class_eval do
+        define_method "postponed_#{association_singular}_ids=" do |array_of_ids_as_strings|
+          assign_or_postpone "#{association_singular}_ids" => array_of_ids_as_strings.map(&:to_i)
+        end
         
-        chain_default_methods association_id
+        define_method "postponed_#{association_singular}_ids" do
+          postponed["#{association_singular}_ids"] || []
+        end
       end
+      
+      by_ids association_id
     end
     
     # Adds default methods only
@@ -82,29 +101,39 @@ module LuckySneaks
   private
     # TODO: Explain this?
     def chain_default_methods(association_id)
+      association_singular = association_id.to_s.singularize
+      
       parent.class_eval do
         define_method "#{association_id}_with_postponed" do
-          postponed[association_id] || self.send("#{association_id}_without_postponed")
+          if self.class.proxy_attribute_procs["add_#{association_singular}"]
+            if postponed["#{association_singular}_ids"]
+              association_singular.classify.constantize.find postponed["#{association_singular}_ids"]
+            else
+              self.send("#{association_id}_without_postponed")
+            end
+          else
+            postponed[association_id] || self.send("#{association_id}_without_postponed")
+          end
         end
         alias_method_chain association_id, :postponed
         
-        association_singular = association_id.to_s.singularize
         define_method "add_#{association_singular}=" do |hash_of_attributes|
           assign_or_postpone "add_#{association_singular}" => hash_of_attributes
         end
         
         define_method "add_#{association_singular}" do
-          name = "@add_#{association_singular}"
-          return instance_variable_get(name) if instance_variable_get(name)
+          name = "add_#{association_singular}"
+          var_name = "@#{name}"
+          return instance_variable_get(var_name) if instance_variable_get(var_name)
           klass = association_singular.classify.constantize
-          if postponed["add_#{association_singular}"].is_a?(Hash) && postponed["add_#{association_singular}"].values.first.is_a?(Hash)
+          if postponed[name].is_a?(Hash) && postponed[name].values.first.is_a?(Hash)
             result = {}
-            postponed["add_#{association_singular}"].each do |key, value|
+            postponed[name].each do |key, value|
               result[key.to_i] = klass.new value
             end
-            instance_variable_set name, result
+            instance_variable_set var_name, result
           else
-            instance_variable_set name, klass.new(postponed["add_#{association_singular}"])
+            instance_variable_set var_name, klass.new(postponed[name])
           end
         end
         
