@@ -361,4 +361,16 @@ class PostponeAssociationsTest < Test::Unit::TestCase
     @attachment = Attachment.find_by_title("postponeable by id")
     assert_equal [@attachment.id], @doc.postponed_attachment_ids
   end
+  
+  def test_add_by_procs_creates_multiple_records
+    @doc = saveable_doc(:add_attachment => {"0" => {:upload => uploaded_jpg, :title => "first attachment"},
+      "1" => {:upload => uploaded_jpg, :title => "second attachment"}})
+    @doc.save
+    @attachment_1 = Attachment.find_by_title("first attachment")
+    @attachment_2 = Attachment.find_by_title("second attachment")
+    assert @doc.attachments.include?(@attachment_1)
+    assert @doc.attachments.include?(@attachment_2)
+    assert_equal @doc, @attachment_1.document
+    assert_equal @doc, @attachment_2.document
+  end
 end

@@ -43,18 +43,29 @@ module LuckySneaks
         end
       end
       
+      def do_proc(assignment, block)
+        assigned = block.call(assignment)
+        if assigned.is_a?(ActiveRecord::Base)
+          association_ids = "#{assigned.class.class_name.downcase}_ids"
+          if postponed[association_ids]
+            postponed[association_ids] << assigned.id
+          else
+            postponed[association_ids] = [assigned.id]
+          end
+        end
+      end
+      
       def assign_or_postpone(assignment_hash)
         if new_record?
           assignment_hash.each do |association_id, assignment|
-            if fallback = self.class.proxy_attribute_procs[association_id]
-              assigned = fallback.call(assignment)
-              if assigned.is_a?(ActiveRecord::Base)
-                association_ids = "#{assigned.class.class_name.downcase}_ids"
-                if postponed[association_ids]
-                  postponed[association_ids] << assigned.id
-                else
-                  postponed[association_ids] = [assigned.id]
+            if block = self.class.proxy_attribute_procs[association_id]
+              if assignment.values.first.is_a?(Hash)
+                assignment.each do |index, actual_assignment|
+                  next if actual_assignment.values.all?{|v| v.blank?}
+                  do_proc actual_assignment, block
                 end
+              else
+                do_proc assignment, block
               end
             else
               postponed.merge! assignment_hash
