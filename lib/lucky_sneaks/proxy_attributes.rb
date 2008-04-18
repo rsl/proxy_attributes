@@ -51,7 +51,7 @@ module LuckySneaks
               if assigned.is_a?(ActiveRecord::Base)
                 association_ids = "#{assigned.class.class_name.downcase}_ids"
                 if postponed[association_ids]
-                  postponed[association_ids] << [assigned.id]
+                  postponed[association_ids] << assigned.id
                 else
                   postponed[association_ids] = [assigned.id]
                 end
@@ -69,18 +69,14 @@ module LuckySneaks
               return if assignment == self.send("#{association_id}_without_postponed")
               assign_proxy_members_by_string association_id, assignment
             elsif association_id =~ /^add_/
-              if assignment.is_a?(Hash)
-                return if assignment.values.all?{|v| v.blank?}
-                if assignment.values.first.is_a?(Hash)
-                  assignment.each do |index, actual_assignment|
-                    next if actual_assignment.values.all?{|v| v.blank?}
-                    create_proxy_member association_id, actual_assignment
-                  end
-                else
-                  create_proxy_member association_id, assignment
+              return if assignment.values.all?{|v| v.blank?}
+              if assignment.values.first.is_a?(Hash)
+                assignment.each do |index, actual_assignment|
+                  next if actual_assignment.values.all?{|v| v.blank?}
+                  create_proxy_member association_id, actual_assignment
                 end
               else
-                push_proxy_member association_id, assignment
+                create_proxy_member association_id, assignment
               end
             elsif association_id =~ /^manage_/
               if assignment.values.first.is_a?(Hash)
@@ -96,16 +92,14 @@ module LuckySneaks
       def assign_proxy_members_by_ids(association_id, array_of_ids)
         proxy = fetch_proxy(association_id.chomp("_ids"))
         
-        if array_of_ids == self.send("#{association_id}_without_postponed")
-          if self.class.proxy_attribute_procs["add_#{proxy.name.to_s.singularize}"]
-            proxy.klass.update array_of_ids, Array.new(array_of_ids.size, {proxy.primary_key_name => id})
-          end
-          return
+        if array_of_ids == self.send("#{association_id}_without_postponed") &&
+          !self.class.proxy_attribute_procs["add_#{proxy.name.to_s.singularize}"]
+            return
         end
         
         reset_proxy(proxy)
         
-        self.send(proxy.name) << proxy.klass.find(array_of_ids)
+        self.send("#{proxy.name}_without_postponed") << proxy.klass.find(array_of_ids)
       end
       
       def assign_proxy_members_by_string(association_id, string)
@@ -136,16 +130,11 @@ module LuckySneaks
         member = proxy.klass.new(hash_of_attributes)
         if member.save
           if proxy.through_reflection
-            self.send(proxy.name) << member
+            self.send("#{proxy.name}_without_postponed") << member
           end
         else
           postpone_errors member
         end
-      end
-      
-      def push_proxy_member(association_id, member)
-        proxy = fetch_proxy(association_id.sub(/add_/, ""))
-        self.send(proxy.name) << member
       end
       
       def manage_proxy_member(association_id, member_id, hash_of_attributes)
@@ -165,7 +154,7 @@ module LuckySneaks
         if proxy.through_reflection
           self.send(proxy.through_reflection.name).clear
         else
-          self.send(proxy.name).clear
+          self.send("#{proxy.name}_without_postponed").clear
         end
       end
       
