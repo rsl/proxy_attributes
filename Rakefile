@@ -25,3 +25,19 @@ Rake::RDocTask.new(:rdoc) do |rdoc|
   rdoc.rdoc_files.include('README.rdoc')
   rdoc.rdoc_files.include('lib/**/*.rb')
 end
+
+begin
+  require 'rcov/rcovtask'
+  desc 'Generate coverage tests for the ProxyAttributes plugin'
+  Rcov::RcovTask.new do |t|
+    t.libs << "test"
+    t.test_files = FileList['test/**/*_test.rb']
+    t.rcov_opts << '-x' << '"^\/"'
+    if ENV['NON_NATIVE']
+      t.rcov_opts << "--no-rcovrt"
+    end
+    t.verbose = true
+  end
+rescue LoadError
+  # Carry on...
+end
