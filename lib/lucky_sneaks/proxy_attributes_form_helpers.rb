@@ -1,4 +1,5 @@
 module LuckySneaks
+  # TODO: Jesus this could use some loving!
   module ProxyAttributesFormHelpers
     # Simply a shortcut for the somewhat standard check_box_tag used for
     # <tt>has_and_belongs_to_many</tt> checkboxes popularized by Ryan Bates'
