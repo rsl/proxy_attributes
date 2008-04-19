@@ -38,7 +38,7 @@ ActiveRecord::Schema.define(:version => 1) do
   
   create_table :attachments, :force => true do |t|
     t.integer :document_id
-    t.string :title, :filename, :content_type
+    t.string :title
   end
   
   create_table :badges, :force => true do |t|
@@ -67,9 +67,7 @@ class Document < ActiveRecord::Base
   proxy_attributes do
     by_ids :categories, :badges
     by_string :tags => :title, :mystery_meats => :meat
-    by_proc :attachments do |params|
-      Attachment.create(params)
-    end
+    by_force :attachments
   end
   
   validates_presence_of :title
@@ -101,11 +99,6 @@ end
 
 class Attachment < ActiveRecord::Base
   belongs_to :document
-  
-  def upload=(file_upload)
-    self.filename = file_upload.original_filename
-    self.content_type = file_upload.content_type
-  end
 end
 
 class Badge < ActiveRecord::Base
@@ -123,18 +116,6 @@ class PostponeAssociationsTest < Test::Unit::TestCase
   
   def unsaveable_doc(optional = {})
     Document.new(optional)
-  end
-  
-  def uploaded_jpg
-    filename = "bell.jpg"
-    returning Tempfile.new(filename) do |t|
-      FileUtils.copy_file File.join(File.dirname(__FILE__), 'fixtures', 'bell.jpg'), t.path
-      (class << t; self; end).class_eval do
-        alias local_path path
-        define_method(:original_filename) { filename }
-        define_method(:content_type) { "image/jpeg" }
-      end
-    end
   end
   
   def setup
@@ -335,16 +316,16 @@ class PostponeAssociationsTest < Test::Unit::TestCase
     end
   end
   
-  def test_adds_child_by_proc_if_parent_saves
-    @doc = saveable_doc(:add_attachment => {:upload => uploaded_jpg, :title => "uploadable"})
+  def test_adds_child_by_force_if_parent_saves
+    @doc = saveable_doc(:add_attachment => {:title => "uploadable"})
     @doc.save
     @attachment = Attachment.find_by_title("uploadable")
     assert_equal [@attachment], @doc.attachments
     assert_equal @doc, @attachment.document
   end
   
-  def test_add_child_by_proc_creates_unassociated_child_when_parent_save_fails
-    @doc = unsaveable_doc(:add_attachment => {:upload => uploaded_jpg, :title => "unsaveable parent"})
+  def test_add_child_by_force_creates_unassociated_child_when_parent_save_fails
+    @doc = unsaveable_doc(:add_attachment => {:title => "unsaveable parent"})
     @doc.save
     @attachment = Attachment.find_by_title("unsaveable parent")
     assert @attachment.document.nil?
@@ -355,16 +336,9 @@ class PostponeAssociationsTest < Test::Unit::TestCase
     assert_equal [], @doc.attachments_without_postponed
   end
   
-  def test_add_child_by_proc_adds_created_child_id_to_postponed_child_ids_when_parent_save_fails
-    @doc = unsaveable_doc(:add_attachment => {:upload => uploaded_jpg, :title => "postponeable by id"})
-    @doc.save
-    @attachment = Attachment.find_by_title("postponeable by id")
-    assert_equal [@attachment.id], @doc.postponed_attachment_ids
-  end
-  
-  def test_add_by_procs_creates_multiple_records
-    @doc = saveable_doc(:add_attachment => {"0" => {:upload => uploaded_jpg, :title => "first attachment"},
-      "1" => {:upload => uploaded_jpg, :title => "second attachment"}})
+  def test_add_child_by_force_creates_multiple_records
+    @doc = saveable_doc(:add_attachment => {"0" => {:title => "first attachment"},
+      "1" => {:title => "second attachment"}})
     @doc.save
     @attachment_1 = Attachment.find_by_title("first attachment")
     @attachment_2 = Attachment.find_by_title("second attachment")

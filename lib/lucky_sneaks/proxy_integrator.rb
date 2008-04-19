@@ -63,32 +63,12 @@ module LuckySneaks
       end
     end
     
-    # Used to force creation of the child object instead of postponing its creation.
-    # After the child is created it's handled as if it were <tt>by_ids</tt> in regards to how
-    # it is postponed.
-    # 
-    # I personally only use this for uploads where the file has been uploaded and a tempfile
-    # created and needs to be handled immediately. It's not the prettiest methodology and
-    # just might change in the near future.
-    # 
-    # Note: You'll need to have a hidden field with <tt>postponed_child_ids</tt>
-    # (where the name reflects the actual child association [not the word "child"])
-    def by_proc(association_id, &block)
-      association_singular = association_id.to_s.singularize
-      
-      parent.proxy_attribute_procs["add_#{association_singular}"] = block
-      
-      parent.class_eval do
-        define_method "postponed_#{association_singular}_ids=" do |array_of_ids_as_strings|
-          assign_or_postpone "#{association_singular}_ids" => array_of_ids_as_strings.map(&:to_i)
-        end
-        
-        define_method "postponed_#{association_singular}_ids" do
-          postponed["#{association_singular}_ids"] || []
-        end
+    def by_force(*association_ids)
+      association_ids.each do |association_id|
+        parent.forceable_associations << "add_#{association_id.to_s.singularize}"
       end
       
-      by_ids association_id
+      by_ids *association_ids
     end
     
     # Adds default methods only
@@ -105,14 +85,15 @@ module LuckySneaks
       
       parent.class_eval do
         define_method "#{association_id}_with_postponed" do
-          if self.class.proxy_attribute_procs["add_#{association_singular}"]
-            if postponed["#{association_singular}_ids"]
-              association_singular.classify.constantize.find postponed["#{association_singular}_ids"]
+          if new_record?
+            if self.forceable_associations.include?("add_#{association_singular}")
+              proxy = self.class.reflect_on_association(association_id)
+              proxy.klass.find(postponed["#{association_id.to_s.singularize}_ids"])
             else
-              self.send("#{association_id}_without_postponed")
+              postponed[association_id] || []
             end
           else
-            postponed[association_id] || self.send("#{association_id}_without_postponed")
+            self.send("#{association_id}_without_postponed")
           end
         end
         alias_method_chain association_id, :postponed

@@ -11,9 +11,9 @@ module LuckySneaks
       # Please read the README.rdoc[link:files/README_rdoc.html]
       # for a full explanation and example of this method
       def proxy_attributes(&block)
-        cattr_accessor :attributes_for_string, :dont_swallow_errors, :proxy_attribute_procs
+        cattr_accessor :attributes_for_string, :forceable_associations, :dont_swallow_errors
         self.attributes_for_string = {}.with_indifferent_access
-        self.proxy_attribute_procs = {}.with_indifferent_access
+        self.forceable_associations = []
         
         integrator = LuckySneaks::ProxyIntegrator.new(self)
         integrator.instance_eval(&block)
@@ -43,30 +43,11 @@ module LuckySneaks
         end
       end
       
-      def do_proc(assignment, block)
-        assigned = block.call(assignment)
-        if assigned.is_a?(ActiveRecord::Base)
-          association_ids = "#{assigned.class.class_name.downcase}_ids"
-          if postponed[association_ids]
-            postponed[association_ids] << assigned.id
-          else
-            postponed[association_ids] = [assigned.id]
-          end
-        end
-      end
-      
       def assign_or_postpone(assignment_hash)
         if new_record?
           assignment_hash.each do |association_id, assignment|
-            if block = self.class.proxy_attribute_procs[association_id]
-              if assignment.values.first.is_a?(Hash)
-                assignment.each do |index, actual_assignment|
-                  next if actual_assignment.values.all?{|v| v.blank?}
-                  do_proc actual_assignment, block
-                end
-              else
-                do_proc assignment, block
-              end
+            if self.class.forceable_associations.include?(association_id)
+              create_proxy_members association_id, assignment
             else
               postponed.merge! assignment_hash
             end
@@ -80,20 +61,10 @@ module LuckySneaks
               return if assignment == self.send("#{association_id}_without_postponed")
               assign_proxy_members_by_string association_id, assignment
             elsif association_id =~ /^add_/
-              return if assignment.values.all?{|v| v.blank?}
-              if assignment.values.first.is_a?(Hash)
-                assignment.each do |index, actual_assignment|
-                  next if actual_assignment.values.all?{|v| v.blank?}
-                  create_proxy_member association_id, actual_assignment
-                end
-              else
-                create_proxy_member association_id, assignment
-              end
+              create_proxy_members association_id, assignment
             elsif association_id =~ /^manage_/
-              if assignment.values.first.is_a?(Hash)
-                assignment.each do |member_id, actual_assignment|
-                  manage_proxy_member association_id, member_id, actual_assignment
-                end
+              assignment.each do |member_id, actual_assignment|
+                manage_proxy_member association_id, member_id, actual_assignment
               end
             end
           end
@@ -102,11 +73,6 @@ module LuckySneaks
       
       def assign_proxy_members_by_ids(association_id, array_of_ids)
         proxy = fetch_proxy(association_id.chomp("_ids"))
-        
-        if array_of_ids == self.send("#{association_id}_without_postponed") &&
-          !self.class.proxy_attribute_procs["add_#{proxy.name.to_s.singularize}"]
-            return
-        end
         
         reset_proxy(proxy)
         
@@ -133,18 +99,39 @@ module LuckySneaks
       end
       
       def create_proxy_member(association_id, hash_of_attributes)
-        proxy = fetch_proxy(association_id.sub(/add_/, ""))
+        association_root = association_id.sub(/add_/, "")
+        proxy = fetch_proxy(association_root)
         
-        unless proxy.through_reflection
+        unless proxy.through_reflection || new_record?
           hash_of_attributes.merge!(proxy.primary_key_name => id)
         end
+        
         member = proxy.klass.new(hash_of_attributes)
         if member.save
           if proxy.through_reflection
             self.send("#{proxy.name}_without_postponed") << member
+          elsif new_record?
+            association_ids = "#{association_root}_ids"
+            if postponed[association_ids].blank?
+              postponed["#{association_root}_ids"] = [member.id]
+            else
+              postponed["#{association_root}_ids"] << member.id
+            end
           end
         else
           postpone_errors member
+        end
+      end
+      
+      def create_proxy_members(association_id, assignment)
+        return if assignment.values.all?{|v| v.blank?}
+        if assignment.values.first.is_a?(Hash)
+          assignment.each do |index, actual_assignment|
+            next if actual_assignment.values.all?{|v| v.blank?}
+            create_proxy_member association_id, actual_assignment
+          end
+        else
+          create_proxy_member association_id, assignment
         end
       end
       
