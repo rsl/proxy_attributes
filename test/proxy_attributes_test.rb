@@ -333,6 +333,7 @@ class PostponeAssociationsTest < Test::Unit::TestCase
     assert_equal [@attachment], @doc.attachments
     # Because...
     assert_equal [@attachment], @doc.attachments_with_postponed
+    assert_equal @attachment.id.to_s, @doc.postponed_attachment_ids
     assert_equal [], @doc.attachments_without_postponed
   end
   
@@ -346,5 +347,14 @@ class PostponeAssociationsTest < Test::Unit::TestCase
     assert @doc.attachments.include?(@attachment_2)
     assert_equal @doc, @attachment_1.document
     assert_equal @doc, @attachment_2.document
+  end
+  
+  def test_postponed_child_ids_associates_records
+    @attachment = Attachment.create!(:title => "pre-existing")
+    @doc = saveable_doc(:postponed_attachment_ids => @attachment.id.to_s)
+    @doc.save
+    assert @doc.attachments.include?(@attachment)
+    @attachment.reload
+    assert_equal @doc, @attachment.document
   end
 end

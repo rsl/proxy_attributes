@@ -46,10 +46,14 @@ module LuckySneaks
       def assign_or_postpone(assignment_hash)
         if new_record?
           assignment_hash.each do |association_id, assignment|
-            if self.class.forceable_associations.include?(association_id)
+            if forceable?(association_id)
               create_proxy_members association_id, assignment
             else
-              postponed.merge! assignment_hash
+              if postponed[association_id]
+                postponed[association_id] | assignment
+              else
+                postponed.merge! assignment_hash
+              end
             end
           end
         else
@@ -102,25 +106,33 @@ module LuckySneaks
         association_root = association_id.sub(/add_/, "")
         proxy = fetch_proxy(association_root)
         
-        unless proxy.through_reflection || new_record?
+        if manually_settable?(proxy) && !new_record?
           hash_of_attributes.merge!(proxy.primary_key_name => id)
         end
         
         member = proxy.klass.new(hash_of_attributes)
         if member.save
-          if proxy.through_reflection
+          if !manually_settable?(proxy) && !new_record?
             self.send("#{proxy.name}_without_postponed") << member
-          elsif new_record?
+          elsif forceable?(association_id)
             association_ids = "#{association_root}_ids"
             if postponed[association_ids].blank?
-              postponed["#{association_root}_ids"] = [member.id]
+              postponed[association_ids] = [member.id]
             else
-              postponed["#{association_root}_ids"] << member.id
+              postponed[association_ids] << member.id
             end
           end
         else
           postpone_errors member
         end
+      end
+      
+      def manually_settable?(proxy)
+        !proxy.options.any?{|key, value| [:through, :as].include? key}
+      end
+      
+      def forceable?(association_id)
+        self.class.forceable_associations.include?(association_id)
       end
       
       def create_proxy_members(association_id, assignment)

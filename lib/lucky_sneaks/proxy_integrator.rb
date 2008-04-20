@@ -65,7 +65,20 @@ module LuckySneaks
     
     def by_force(*association_ids)
       association_ids.each do |association_id|
-        parent.forceable_associations << "add_#{association_id.to_s.singularize}"
+        association_singular = association_id.to_s.singularize
+        
+        parent.forceable_associations << "add_#{association_singular}"
+        
+        parent.class_eval do
+          define_method "postponed_#{association_singular}_ids" do
+            postponed_ids = postponed["#{association_id.to_s.singularize}_ids"]
+            postponed_ids.blank? ? "" : postponed_ids.join(",")
+          end
+          
+          define_method "postponed_#{association_singular}_ids=" do |array_of_id_strings|
+            assign_or_postpone "#{association_singular}_ids" => array_of_id_strings.split(",").map(&:to_i)
+          end
+        end
       end
       
       by_ids *association_ids
@@ -88,7 +101,8 @@ module LuckySneaks
           if new_record?
             if self.forceable_associations.include?("add_#{association_singular}")
               proxy = self.class.reflect_on_association(association_id)
-              proxy.klass.find(postponed["#{association_id.to_s.singularize}_ids"])
+              postponed_ids = postponed["#{association_id.to_s.singularize}_ids"]
+              postponed_ids.blank? ? [] : proxy.klass.find(postponed_ids)
             else
               postponed[association_id] || []
             end
