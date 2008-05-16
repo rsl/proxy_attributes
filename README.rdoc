@@ -16,7 +16,7 @@ Let's look at some examples and then I'll point out any features not salient fro
   
     validates_presence_of :title
   
-    proxy_attributes
+    proxy_attributes do
       # Will provide category_ids= method, in addition to add_category
       by_ids :categories
       
