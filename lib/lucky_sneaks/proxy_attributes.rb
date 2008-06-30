@@ -101,6 +101,9 @@ module LuckySneaks
         self.send(proxy.name) << string.split(separator).map { |substring|
           next if substring.blank?
           member = proxy.klass.send("find_or_initialize_by_#{attribute}", substring)
+          if before_creation_proc = self.class.before_creating_procs[association_id.singularize]
+            instance_exec member, &before_creation_proc
+          end
           if member.save
             member
           else
@@ -119,11 +122,9 @@ module LuckySneaks
         end
         
         member = proxy.klass.new(hash_of_attributes)
-        
         if before_creation_proc = self.class.before_creating_procs[association_root]
           instance_exec member, &before_creation_proc
         end
-        
         if member.save
           if !manually_settable?(proxy) && !new_record?
             self.send("#{proxy.name}_without_postponed") << member

@@ -386,4 +386,16 @@ class PostponeAssociationsTest < Test::Unit::TestCase
     assert @project.mystery_meats.include?(@meat)
     assert_equal @project, @meat.project
   end
+  
+  def test_children_as_string_allows_procs
+    @project = Project.create!(:title => "some project")
+    @doc = @project.documents.create(:title => "document in a project")
+    assert @project.documents.include?(@doc)
+    assert_equal @project, @doc.project
+    @doc.mystery_meats_as_string = "mystery meat for document in a project from string"
+    @doc.save
+    @meat = MysteryMeat.find_by_meat("mystery meat for document in a project from string")
+    assert @project.mystery_meats.include?(@meat)
+    assert_equal @project, @meat.project
+  end
 end
