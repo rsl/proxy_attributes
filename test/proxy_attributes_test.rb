@@ -16,7 +16,12 @@ ActiveRecord::Base.establish_connection(:adapter => "sqlite3", :dbfile => "proxy
 
 ActiveRecord::Migration.verbose = false
 ActiveRecord::Schema.define(:version => 1) do
+  create_table :projects, :force => true do |t|
+    t.string :title
+  end
+  
   create_table :documents, :force => true do |t|
+    t.integer :project_id
     t.string :title
   end
 
@@ -47,13 +52,20 @@ ActiveRecord::Schema.define(:version => 1) do
   end
   
   create_table :mystery_meats, :force => true do |t|
-    t.integer :document_id
+    t.integer :document_id, :project_id
     t.string :meat
   end
 end
 ActiveRecord::Migration.verbose = true
 
+class Project < ActiveRecord::Base
+  has_many :documents
+  has_many :mystery_meats
+end
+
 class Document < ActiveRecord::Base
+  belongs_to :project
+  
   has_many :categorizations
   has_many :categories, :through => :categorizations
   
@@ -68,6 +80,10 @@ class Document < ActiveRecord::Base
     by_ids :categories, :badges
     by_string :tags => :title, :mystery_meats => :meat
     by_force :attachments
+    
+    before_creating(:mystery_meats) do |meat|
+      meat.project_id = self.project_id
+    end
   end
   
   validates_presence_of :title
@@ -107,6 +123,7 @@ end
 
 class MysteryMeat < ActiveRecord::Base
   belongs_to :document
+  belongs_to :project
 end
 
 class PostponeAssociationsTest < Test::Unit::TestCase
@@ -356,5 +373,17 @@ class PostponeAssociationsTest < Test::Unit::TestCase
     assert @doc.attachments.include?(@attachment)
     @attachment.reload
     assert_equal @doc, @attachment.document
+  end
+  
+  def test_child_creation_allows_procs
+    @project = Project.create!(:title => "some project")
+    @doc = @project.documents.create(:title => "document in a project")
+    assert @project.documents.include?(@doc)
+    assert_equal @project, @doc.project
+    @doc.add_mystery_meat = {:meat => "mystery meat for document in a project"}
+    @doc.save
+    @meat = MysteryMeat.find_by_meat("mystery meat for document in a project")
+    assert @project.mystery_meats.include?(@meat)
+    assert_equal @project, @meat.project
   end
 end

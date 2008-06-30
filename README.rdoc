@@ -9,6 +9,7 @@ Let's look at some examples and then I'll point out any features not salient fro
 === In the Model
 
   class Document < ActiveRecord::Base
+    belongs_to :project
     has_many :categorizations
     has_many :categories, :through => :categorizations
     has_many :taggings
@@ -26,6 +27,13 @@ Let's look at some examples and then I'll point out any features not salient fro
       # There's also just_defaults which simply adds add_foos
       # shown here just for the sake of example [but commented out, natch!]
       # just_defaults :foos
+      
+      # Allows categories and tags to 'steal' the document's project_id
+      # and correctly associate itself with the document's project
+      # [both category and tag <tt>belong_to :project</tt> as well]
+      before_creating(:categories, :tags) do |child|
+        child.project_id = self.project_id
+      end
     end
   end
 
@@ -97,7 +105,7 @@ A few notes on that view...
 
 <tt>proxy_attributes_check_box_tag</tt> :: Read the docs[link:classes/LuckySneaks/ProxyAttributesFormHelpers.html#M000003]. It's really just that simple. Really.
 <tt>fields_for(html_name, actual_proxy_object)</tt> :: Nothing really spectacular to note here either. Except that <tt>@document.add_category</tt> returns a new Category just to please <tt>fields_for</tt>. Most of the time you should not be calling +add_child+ directly but using it with an attribute hash as shown in the example for the controller code.
-<tt>f.text_field :tags_as_string</tt> :: Using the models in the example, this handy little method [internal to the model, not the view] is shorthand for <tt>@document.tags.map(&:title).join(", ")</tt>. Hopefully comma-separated tags [or whatever] are everyone's bag. If not, please let me know and I'll see what i can do about accommodating your preferences. Or, better yet, just fork ProxyAttributes from github[http://github.com/rsl/proxy_attributes/tree/master], patch away, and gimme a pull request.
+<tt>f.text_field :tags_as_string</tt> :: Using the models in the example, this handy little method [internal to the model, not the view] is shorthand for <tt>@document.tags.map(&:title).join(", ")</tt>. The default is comma-separated tags but you can change this by setting the <tt>:separator</tt> option on <tt>by_string</tt> to <tt>:space</tt>.
   
 If you want multiple <tt>add_child</tt> fields, simply add an index value to the fields_for arguments like so:
 

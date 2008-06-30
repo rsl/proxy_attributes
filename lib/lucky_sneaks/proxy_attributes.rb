@@ -11,9 +11,11 @@ module LuckySneaks
       # Please read the README.rdoc[link:files/README_rdoc.html]
       # for a full explanation and example of this method
       def proxy_attributes(&block)
-        cattr_accessor :attributes_for_string, :forceable_associations, :dont_swallow_errors
+        cattr_accessor :attributes_for_string, :forceable_associations, :dont_swallow_errors,
+          :before_creating_procs, :attributes_as_string_separator
         self.attributes_for_string = {}.with_indifferent_access
         self.forceable_associations = []
+        self.before_creating_procs = {}.with_indifferent_access
         
         integrator = LuckySneaks::ProxyIntegrator.new(self)
         integrator.instance_eval(&block)
@@ -90,7 +92,13 @@ module LuckySneaks
         
         reset_proxy(proxy)
         
-        self.send(proxy.name) << string.split(/,\s*/).map { |substring|
+        separator = case self.class.attributes_as_string_separator
+        when "space"
+          /\s+/
+        else
+          /,\s*/
+        end
+        self.send(proxy.name) << string.split(separator).map { |substring|
           next if substring.blank?
           member = proxy.klass.send("find_or_initialize_by_#{attribute}", substring)
           if member.save
@@ -111,6 +119,11 @@ module LuckySneaks
         end
         
         member = proxy.klass.new(hash_of_attributes)
+        
+        if before_creation_proc = self.class.before_creating_procs[association_root]
+          instance_exec member, &before_creation_proc
+        end
+        
         if member.save
           if !manually_settable?(proxy) && !new_record?
             self.send("#{proxy.name}_without_postponed") << member

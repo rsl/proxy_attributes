@@ -37,8 +37,11 @@ module LuckySneaks
       end
     end
     
-    # Used to generate children_as_string method[s] for the association
+    # Used to generate children_as_string method[s] for the association. Accepts
+    # optional <tt>:separator</tt> which should be either <tt>:comma</tt> [default] or
+    # <tt>space</tt>.
     def by_string(association_hash)
+      parent.attributes_as_string_separator = association_hash.delete(:separator).to_s || "comma"
       association_hash.each do |association_id, attribute_for_string|
         parent.class_eval do
           self.attributes_for_string[association_id] = attribute_for_string.to_sym
@@ -49,7 +52,14 @@ module LuckySneaks
           
           # Note: This becomes children_as_string_without_postponed
           define_method "#{association_id}_as_string" do
-            self.send(association_id).map(&self.class.attributes_for_string[association_id]).join(", ")
+            self.send(association_id).map(&self.class.attributes_for_string[association_id]).join(
+              case self.class.attributes_as_string_separator
+              when "space"
+                " "
+              else
+                ", "
+              end
+            )
           end
           
           define_method "#{association_id}_as_string_with_postponed" do
@@ -88,6 +98,27 @@ module LuckySneaks
     def just_defaults(*association_ids)
       association_ids.each do |association_id|
         chain_default_methods association_id
+      end
+    end
+    
+    # Allows custom code to be executed before creating the child object. This is useful
+    # in cases where an attribute on the child object depends on an attribute of its parent.
+    # Example:
+    # 
+    #   class Document < ActiveRecord::Base
+    #     # Document and Attachment both belong to Project
+    #     proxy_attributes do
+    #       just_defaults :attachments
+    #       
+    #       before_creating(:attachments) do |attachment|
+    #         # Steal the project_id from the document
+    #         attachment.project_id = self.project_id
+    #       end
+    #     end
+    #   end
+    def before_creating(*association_ids, &block)
+      association_ids.each do |association_id|
+        parent.before_creating_procs[association_id.to_s.singularize] = block
       end
     end
     
