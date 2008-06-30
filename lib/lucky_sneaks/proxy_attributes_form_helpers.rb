@@ -22,7 +22,7 @@ module LuckySneaks
       if previous_check_box_exists_for[method_name]
         check_box_tag method_name, object_to_check.id, checked_value
       else
-        previous_check_box_for[method_name] = true
+        previous_check_box_exists_for[method_name] = true
         [
           hidden_field_tag(method_name, 0),
           check_box_tag(method_name, object_to_check.id, checked_value)
