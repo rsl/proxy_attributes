@@ -131,14 +131,16 @@ module LuckySneaks
           end
         end
         if member.save
-          if !manually_settable?(proxy) && !new_record?
-            self.send("#{proxy.name}_without_postponed") << member
-          elsif forceable?(association_id)
-            association_ids = "#{association_root}_ids"
-            if postponed[association_ids].blank?
-              postponed[association_ids] = [member.id]
-            else
-              postponed[association_ids] << member.id
+          if !manually_settable?(proxy) 
+            if !new_record?
+              self.send("#{proxy.name}_without_postponed") << member
+            elsif forceable?(association_id)
+              association_ids = "#{association_root}_ids"
+              if postponed[association_ids].blank?
+                postponed[association_ids] = [member.id]
+              else
+                postponed[association_ids] << member.id
+              end
             end
           end
         else
