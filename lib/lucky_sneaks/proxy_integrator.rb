@@ -86,6 +86,7 @@ module LuckySneaks
           end
           
           define_method "postponed_#{association_singular}_ids=" do |array_of_id_strings|
+            return if array_of_id_strings.blank?
             assign_or_postpone "#{association_singular}_ids" => array_of_id_strings.split(",").map(&:to_i)
           end
         end
@@ -146,6 +147,7 @@ module LuckySneaks
         alias_method_chain association_id, :postponed
         
         define_method "add_#{association_singular}=" do |hash_of_attributes|
+          return if hash_of_attributes.blank?
           assign_or_postpone "add_#{association_singular}" => hash_of_attributes
         end
         
@@ -166,6 +168,7 @@ module LuckySneaks
         end
         
         define_method "manage_#{association_singular}=" do |hash_of_attributes|
+          return if hash_of_attributes.blank?
           assign_or_postpone "manage_#{association_singular}" => hash_of_attributes
         end
         
