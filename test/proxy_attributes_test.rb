@@ -22,7 +22,7 @@ ActiveRecord::Schema.define(:version => 1) do
   
   create_table :documents, :force => true do |t|
     t.integer :project_id
-    t.string :title
+    t.string :title, :type
   end
 
   create_table :categories, :force => true do |t|
@@ -53,13 +53,14 @@ ActiveRecord::Schema.define(:version => 1) do
   
   create_table :mystery_meats, :force => true do |t|
     t.integer :document_id, :project_id
-    t.string :meat
+    t.string :meat, :garnish
   end
 end
 ActiveRecord::Migration.verbose = true
 
 class Project < ActiveRecord::Base
   has_many :documents
+  has_many :pages
   has_many :mystery_meats
 end
 
@@ -87,6 +88,14 @@ class Document < ActiveRecord::Base
   end
   
   validates_presence_of :title
+end
+
+class Page < Document
+  proxy_attributes do
+    before_creating(:mystery_meats) do |meat|
+      meat.garnish = self.title
+    end
+  end
 end
 
 class Category < ActiveRecord::Base
@@ -135,6 +144,14 @@ class PostponeAssociationsTest < Test::Unit::TestCase
     Document.new(optional)
   end
   
+  def saveable_page(optional = {})
+    unsaveable_page(optional.merge(:title => "Saveable Page"))
+  end
+  
+  def unsaveable_page(optional = {})
+    Page.new(optional)
+  end
+  
   def setup
     # Just to be safe
     [Document, Category, Tag, Attachment, MysteryMeat].each do |foo|
@@ -169,7 +186,15 @@ class PostponeAssociationsTest < Test::Unit::TestCase
     assert_equal [@badge.id], @doc.badge_ids
   end
   
-  def test_creates_child_by_ids_if_parent_saves
+  def test_assigns_children_by_ids_sti_support
+    @cat = Category.create(:title => "Saved Page")
+    @page = saveable_page(:category_ids => [@cat.id])
+    @page.save
+    assert @page.categories.include?(@cat)
+    assert @cat.documents.include?(@page)
+  end
+  
+  def test_add_child_if_parent_saves
     @doc = saveable_doc(:add_category => {:title => "Created"})
     @doc.save
     @cat = Category.find_by_title("Created")
@@ -177,14 +202,14 @@ class PostponeAssociationsTest < Test::Unit::TestCase
     assert @cat.documents.include?(@doc)
   end
   
-  def test_does_not_create_child_if_parent_save_fails
+  def test_does_not_add_child_if_parent_save_fails
     @doc = unsaveable_doc(:add_category => {:title => "Not Created"})
     @doc.save
     assert @doc.categories.empty?
     assert_nil Category.find_by_title("Not Created")
   end
   
-  def test_caches_attributes_for_reassignment_if_parent_save_fails
+  def test_add_child_caches_attributes_for_reassignment_if_parent_save_fails
     @doc = unsaveable_doc(:add_category => {:title => "Not Created"})
     @doc.save
     # Man I wish Foo.new == Foo.new, but it doesn't
@@ -225,6 +250,14 @@ class PostponeAssociationsTest < Test::Unit::TestCase
     @badge = Badge.find_by_title("Clingy")
     assert @doc.badges.include?(@badge)
     assert_equal @doc, @badge.document
+  end
+  
+  def test_add_child_sti_support
+    @page = saveable_page(:add_category => {:title => "Created"})
+    @page.save
+    @cat = Category.find_by_title("Created")
+    assert @page.categories.include?(@cat)
+    assert @cat.documents.include?(@page)
   end
   
   def test_assigns_children_by_string_if_parent_saves
@@ -397,5 +430,18 @@ class PostponeAssociationsTest < Test::Unit::TestCase
     @meat = MysteryMeat.find_by_meat("mystery meat for document in a project from string")
     assert @project.mystery_meats.include?(@meat)
     assert_equal @project, @meat.project
+  end
+  
+  def test_child_creation_procs_with_sti
+    @project = Project.create!(:title => "some project")
+    @page = @project.pages.create(:title => "page in a project")
+    assert @project.pages.include?(@page)
+    assert_equal @project, @page.project
+    @page.add_mystery_meat = {:meat => "mystery meat for page in a project"}
+    @page.save
+    @meat = MysteryMeat.find_by_meat("mystery meat for page in a project")
+    assert @project.mystery_meats.include?(@meat)
+    assert_equal @project, @meat.project
+    assert_equal @page.title, @meat.garnish
   end
 end

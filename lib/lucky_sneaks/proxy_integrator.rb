@@ -118,7 +118,9 @@ module LuckySneaks
     #   end
     def before_creating(*association_ids, &block)
       association_ids.each do |association_id|
-        parent.before_creating_procs[association_id.to_s.singularize] = block
+        key = association_id.to_s.singularize
+        parent.before_creating_procs[key] ||= []
+        parent.before_creating_procs[key] << block
       end
     end
     

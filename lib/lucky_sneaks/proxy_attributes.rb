@@ -11,11 +11,12 @@ module LuckySneaks
       # Please read the README.rdoc[link:files/README_rdoc.html]
       # for a full explanation and example of this method
       def proxy_attributes(&block)
-        cattr_accessor :attributes_for_string, :forceable_associations, :dont_swallow_errors,
-          :before_creating_procs, :attributes_as_string_separator
-        self.attributes_for_string = {}.with_indifferent_access
-        self.forceable_associations = []
-        self.before_creating_procs = {}.with_indifferent_access
+        class_inheritable_accessor :attributes_as_string_separator, :dont_swallow_errors
+        class_inheritable_array :forceable_associations
+        class_inheritable_hash :attributes_for_string, :before_creating_procs
+        self.attributes_for_string ||= {}.with_indifferent_access
+        self.forceable_associations ||= []
+        self.before_creating_procs ||= {}.with_indifferent_access
         
         integrator = LuckySneaks::ProxyIntegrator.new(self)
         integrator.instance_eval(&block)
@@ -101,8 +102,10 @@ module LuckySneaks
         self.send(proxy.name) << string.split(separator).map { |substring|
           next if substring.blank?
           member = proxy.klass.send("find_or_initialize_by_#{attribute}", substring)
-          if before_creation_proc = self.class.before_creating_procs[association_id.singularize]
-            instance_exec member, &before_creation_proc
+          if before_creation_procs = self.class.before_creating_procs[association_id.singularize]
+            before_creation_procs.each do |before_creation_proc|
+              instance_exec member, &before_creation_proc
+            end
           end
           if member.save
             member
@@ -122,8 +125,10 @@ module LuckySneaks
         end
         
         member = proxy.klass.new(hash_of_attributes)
-        if before_creation_proc = self.class.before_creating_procs[association_root]
-          instance_exec member, &before_creation_proc
+        if before_creation_procs = self.class.before_creating_procs[association_root]
+          before_creation_procs.each do |before_creation_proc|
+            instance_exec member, &before_creation_proc
+          end
         end
         if member.save
           if !manually_settable?(proxy) && !new_record?
