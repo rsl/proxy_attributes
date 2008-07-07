@@ -21,8 +21,12 @@ module LuckySneaks
         integrator = LuckySneaks::ProxyIntegrator.new(self)
         integrator.instance_eval(&block)
         
-        before_validation :assign_postponed_forceables
-        after_save :assign_postponed
+        unless self.before_validation_callback_chain.any?{|callback| callback.method == :assign_postponed_forceables}
+          before_validation :assign_postponed_forceables
+        end
+        unless self.after_save_callback_chain.any?{|callback| callback.method == :assign_postponed}
+          after_save :assign_postponed
+        end
       end
     end
     
