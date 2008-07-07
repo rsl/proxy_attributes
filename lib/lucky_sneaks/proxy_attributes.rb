@@ -21,6 +21,7 @@ module LuckySneaks
         integrator = LuckySneaks::ProxyIntegrator.new(self)
         integrator.instance_eval(&block)
         
+        before_validation :assign_postponed_forceables
         after_save :assign_postponed
       end
     end
@@ -36,9 +37,23 @@ module LuckySneaks
         @postponed ||= {}
       end
       
+      def postponed_forceables
+        @postponed_forceables ||= {}
+      end
+      
       def assign_postponed
         postponed.each do |association_id, assignment|
           assign_or_postpone association_id => assignment
+        end
+        unless postponed_errors.blank?
+          errors.add :proxy_attribute_child_errors, postponed_errors.flatten!
+          raise LuckySneaks::ProxyAttributes::InvalidChildAssignment
+        end
+      end
+      
+      def assign_postponed_forceables
+        postponed_forceables.each do |association_id, assignment|
+          create_proxy_members association_id, assignment
         end
         unless postponed_errors.blank?
           errors.add :proxy_attribute_child_errors, postponed_errors.flatten!
@@ -50,7 +65,11 @@ module LuckySneaks
         if new_record?
           assignment_hash.each do |association_id, assignment|
             if forceable?(association_id)
-              create_proxy_members association_id, assignment
+              if postponed_forceables[association_id]
+                postponed_forceables[association_id] | assignment
+              else
+                postponed_forceables.merge! assignment_hash
+              end
             else
               if postponed[association_id]
                 postponed[association_id] | assignment
@@ -131,16 +150,14 @@ module LuckySneaks
           end
         end
         if member.save
-          if !manually_settable?(proxy) 
-            if !new_record?
-              self.send("#{proxy.name}_without_postponed") << member
-            elsif forceable?(association_id)
-              association_ids = "#{association_root}_ids"
-              if postponed[association_ids].blank?
-                postponed[association_ids] = [member.id]
-              else
-                postponed[association_ids] << member.id
-              end
+          if !manually_settable?(proxy) || !new_record?
+            self.send("#{proxy.name}_without_postponed") << member
+          elsif forceable?(association_id)
+            association_ids = "#{association_root}_ids"
+            if postponed[association_ids].blank?
+              postponed[association_ids] = [member.id]
+            else
+              postponed[association_ids] << member.id
             end
           end
         else
