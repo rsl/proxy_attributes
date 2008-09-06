@@ -131,14 +131,17 @@ module LuckySneaks
       association_singular = association_id.to_s.singularize
       
       parent.class_eval do
+        add_name = "add_#{association_singular}"
+        manage_name = "manage_#{association_singular}"
+        
         define_method "#{association_id}_with_postponed" do
           if new_record?
-            if self.forceable_associations.include?("add_#{association_singular}")
+            if forceable_associations.include?(add_name)
               proxy = self.class.reflect_on_association(association_id)
-              postponed_ids = postponed["#{association_id.to_s.singularize}_ids"]
-              postponed_ids.blank? ? [] : proxy.klass.find(postponed_ids)
+              postponed_ids = postponed["#{association_singular}_ids"]
+              postponed_ids.blank? ? self.send("#{association_id}_without_postponed") : proxy.klass.find(postponed_ids)
             else
-              postponed[association_id] || []
+              postponed[association_id] || self.send("#{association_id}_without_postponed")
             end
           else
             self.send("#{association_id}_without_postponed")
@@ -146,39 +149,45 @@ module LuckySneaks
         end
         alias_method_chain association_id, :postponed
         
-        define_method "add_#{association_singular}=" do |hash_of_attributes|
+        define_method "#{add_name}=" do |hash_of_attributes|
           return if hash_of_attributes.blank?
-          assign_or_postpone "add_#{association_singular}" => hash_of_attributes
-        end
-        
-        define_method "add_#{association_singular}" do
-          name = "add_#{association_singular}"
-          var_name = "@#{name}"
-          return instance_variable_get(var_name) if instance_variable_get(var_name)
-          klass = association_singular.classify.constantize
-          if postponed[name].is_a?(Hash) && postponed[name].values.first.is_a?(Hash)
-            result = {}
-            postponed[name].each do |key, value|
-              result[key.to_i] = klass.new value
-            end
-            instance_variable_set var_name, result
+          if forceable_associations.include?(add_name)
+            create_proxy_members add_name, hash_of_attributes
           else
-            instance_variable_set var_name, klass.new(postponed[name])
+            assign_or_postpone add_name => hash_of_attributes
           end
         end
         
-        define_method "manage_#{association_singular}=" do |hash_of_attributes|
-          return if hash_of_attributes.blank?
-          assign_or_postpone "manage_#{association_singular}" => hash_of_attributes
+        define_method add_name do
+          var_name = "@added_#{association_singular}"
+          if added = instance_variable_get(var_name)
+            added
+          else
+            klass = association_singular.classify.constantize
+            if postponed[add_name].is_a?(Hash) && postponed[add_name].values.first.is_a?(Hash)
+              result = {}
+              postponed[add_name].each do |key, value|
+                result[key.to_i] = klass.new value
+              end
+              instance_variable_set var_name, result
+            else
+              instance_variable_set var_name, klass.new(postponed[add_name])
+            end
+          end
         end
         
-        define_method "manage_#{association_singular}" do
-          name = "@managed_#{association_singular}"
-          if managed = instance_variable_get("@managed_#{association_singular}")
+        define_method "#{manage_name}=" do |hash_of_attributes|
+          return if hash_of_attributes.blank?
+          assign_or_postpone manage_name => hash_of_attributes
+        end
+        
+        define_method manage_name do
+          var_name = "@managed_#{association_singular}"
+          if managed = instance_variable_get(var_name)
             managed
           else
             klass = association_singular.classify.constantize
-            instance_variable_set("@managed_#{association_singular}",
+            instance_variable_set(var_name,
               self.send(association_id).inject(Hash.new{|h, k| raise LuckySneaks::ProxyAttributes::ImproperAccess}){ |memo, member|
               # This is body to the inject block
               memo[member.id] = member

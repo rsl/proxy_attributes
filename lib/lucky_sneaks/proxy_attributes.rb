@@ -21,9 +21,6 @@ module LuckySneaks
         integrator = LuckySneaks::ProxyIntegrator.new(self)
         integrator.instance_eval(&block)
         
-        unless self.before_validation_callback_chain.any?{|callback| callback.method == :assign_postponed_forceables}
-          before_validation :assign_postponed_forceables
-        end
         unless self.after_save_callback_chain.any?{|callback| callback.method == :assign_postponed}
           after_save :assign_postponed
         end
@@ -41,10 +38,6 @@ module LuckySneaks
         @postponed ||= {}
       end
       
-      def postponed_forceables
-        @postponed_forceables ||= {}
-      end
-      
       def assign_postponed
         postponed.each do |association_id, assignment|
           assign_or_postpone association_id => assignment
@@ -55,31 +48,13 @@ module LuckySneaks
         end
       end
       
-      def assign_postponed_forceables
-        postponed_forceables.each do |association_id, assignment|
-          create_proxy_members association_id, assignment
-        end
-        unless postponed_errors.blank?
-          errors.add :proxy_attribute_child_errors, postponed_errors.flatten!
-          raise LuckySneaks::ProxyAttributes::InvalidChildAssignment
-        end
-      end
-      
       def assign_or_postpone(assignment_hash)
         if new_record?
           assignment_hash.each do |association_id, assignment|
-            if forceable?(association_id)
-              if postponed_forceables[association_id]
-                postponed_forceables[association_id] | assignment
-              else
-                postponed_forceables.merge! assignment_hash
-              end
+            if postponed[association_id]
+              postponed[association_id] | assignment
             else
-              if postponed[association_id]
-                postponed[association_id] | assignment
-              else
-                postponed.merge! assignment_hash
-              end
+              postponed.merge! assignment_hash
             end
           end
         else
