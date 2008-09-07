@@ -19,7 +19,7 @@ module LuckySneaks
     module InstanceMethods
       def save_with_transaction_hack(perform_validation = true)
         assign_postponed_forceables rescue nil
-        save_with_transactions
+        save_without_transaction_hack
       end
     end
   end
