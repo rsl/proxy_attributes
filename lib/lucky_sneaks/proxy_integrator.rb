@@ -151,11 +151,7 @@ module LuckySneaks
         
         define_method "#{add_name}=" do |hash_of_attributes|
           return if hash_of_attributes.blank?
-          if forceable_associations.include?(add_name)
-            create_proxy_members add_name, hash_of_attributes
-          else
-            assign_or_postpone add_name => hash_of_attributes
-          end
+          assign_or_postpone add_name => hash_of_attributes
         end
         
         define_method add_name do

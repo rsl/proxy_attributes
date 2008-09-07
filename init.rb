@@ -1,5 +1,7 @@
 require "lucky_sneaks/proxy_integrator"
 require "lucky_sneaks/proxy_attributes"
+require "lucky_sneaks/transaction_workarounds"
+ActiveRecord::Base.send :include, LuckySneaks::TransactionWorkarounds
 ActiveRecord::Base.send :include, LuckySneaks::ProxyAttributes
 
 if defined?(ActionView)

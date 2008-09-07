@@ -1,18 +1,21 @@
 require 'test/unit'
 
 begin
-  require File.dirname(__FILE__) + '/../../../config/environment'
+  require File.dirname(__FILE__) + '/../../../../config/environment'
 rescue LoadError
   require 'rubygems'
   gem 'activerecord'
   require 'active_record'
   
-  RAILS_ROOT = File.dirname(__FILE__) 
+  RAILS_ROOT = File.dirname(__FILE__)
+  RAILS_ENV = "proxy_attributes_test"
+  
+  require File.join(File.dirname(__FILE__), '../init')
 end
 
-require File.join(File.dirname(__FILE__), '../init')
-
-ActiveRecord::Base.establish_connection(:adapter => "sqlite3", :dbfile => "proxy_attributes.sqlite3")
+# Let's do it more like Rails does!
+ActiveRecord::Base.configurations[RAILS_ENV] = {:adapter => "sqlite3", :dbfile => "proxy_attributes.sqlite3"}
+ActiveRecord::Base.establish_connection RAILS_ENV
 
 ActiveRecord::Migration.verbose = false
 ActiveRecord::Schema.define(:version => 1) do
