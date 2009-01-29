@@ -17,6 +17,11 @@ module LuckySneaks
     # Note: This method presumes the form_object_name is an instance variable.
     # You can override this by stating a true value for local_variable which
     # will force the helper to look for a local variable with the same name.
+    # 
+    # Also note: This method can blow up in your view specs when using a local
+    # variable. In this case, it's probably best to just stub it out on the
+    # template object and create an expectation that the template receives
+    # the method with the necessary arguments.
     #
     # PS: If you have a better/shorter name for this, I'm all ears. :)
     def proxy_attributes_check_box_tag(form_object_name, proxy_name, object_to_check, local_variable = false)
