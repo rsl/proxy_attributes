@@ -13,11 +13,16 @@ module LuckySneaks
     # 
     # In addition, proxy_attributes_check_box_tag will add a hidden input tag with
     # with value of 0 in order to send the params when no value is checked.
+    # 
+    # Note: This method presumes the form_object_name is an instance variable.
+    # You can override this by stating a true value for local_variable which
+    # will force the helper to look for a local variable with the same name.
     #
     # PS: If you have a better/shorter name for this, I'm all ears. :)
-    def proxy_attributes_check_box_tag(form_object_name, proxy_name, object_to_check)
+    def proxy_attributes_check_box_tag(form_object_name, proxy_name, object_to_check, local_variable = false)
       method_name = "#{form_object_name}[#{proxy_name}][]"
-      checked_value = instance_variable_get("@#{form_object_name}").send(proxy_name).include?(object_to_check.id)
+      parent = local_variable && local_variables.include?(form_object_name.to_s) ? self.send(local_variable) : instance_variable_get("@#{form_object_name}")
+      checked_value = parent.send(proxy_name).include?(object_to_check.id)
       tag = check_box_tag method_name, object_to_check.id, checked_value
       if previous_check_box_exists_for[method_name]
         check_box_tag method_name, object_to_check.id, checked_value
